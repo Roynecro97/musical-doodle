@@ -827,6 +827,7 @@ dependencies = [
  "rand_hc 0.3.2",
  "rodio",
  "serde",
+ "serde_derive",
  "serde_json",
  "simplelog",
  "structopt",
