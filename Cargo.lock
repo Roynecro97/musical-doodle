@@ -850,6 +850,7 @@ dependencies = [
  "git-version",
  "hostname",
  "itertools",
+ "lazy_static",
  "log",
  "pretty_assertions",
  "rand 0.8.5",

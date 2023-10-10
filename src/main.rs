@@ -38,7 +38,7 @@ struct Opt {
     times: u32,
 }
 
-pub fn get_version() -> String {
+pub fn get_version() -> &'static str {
     const VERSION: &str = git_version::git_version!();
 
     #[cfg(debug_assertions)]
@@ -46,7 +46,11 @@ pub fn get_version() -> String {
     #[cfg(not(debug_assertions))]
     const EXTRA: &str = "";
 
-    return format!("magical-doodle {}{}", VERSION, EXTRA);
+    lazy_static::lazy_static! {
+        static ref FULL_VERSION: String = format!("magical-doodle {}{}", VERSION, EXTRA);
+    }
+
+    return FULL_VERSION.as_str();
 }
 
 pub fn os_string() -> String {
