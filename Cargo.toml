@@ -9,6 +9,7 @@ edition = "2021"
 average = "0.14.1"
 color-eyre = "0.6.2"
 ctrlc = "3.4.0"
+git-version = "0.3.5"
 hostname = "0.3.1"
 itertools = "0.11.0"
 log = "0.4.20"
@@ -21,6 +22,12 @@ serde_derive = "1.0.188"
 serde_json = "1.0.105"
 simplelog = "0.12.1"
 structopt = "0.3.26"
+sys-info = "0.9.1"
+time = { version = "0.3.29", features = ["formatting", "macros"] }
 unicase = "2.7.0"
 url = "2.4.1"
 ws = "0.9.2"
+
+[features]
+# Activate old sample main
+play-single-file = []  # TODO: delete
