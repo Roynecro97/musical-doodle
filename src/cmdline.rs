@@ -77,6 +77,7 @@ pub enum LogLevel {
     Debug,
     Info,
     Warning,
+    Error,
     Critical,
 }
 
@@ -88,8 +89,9 @@ impl FromStr for LogLevel {
             "debug" => Ok(Self::Debug),
             "info" => Ok(Self::Info),
             "warning" => Ok(Self::Warning),
+            "error" => Ok(Self::Error),
             "critical" => Ok(Self::Critical),
-            _ => Err("valid values: debug, info, warning, critical"),
+            _ => Err("valid values: debug, info, warning, error, critical"),
         }
     }
 }
@@ -100,7 +102,20 @@ impl AsRef<str> for LogLevel {
             Self::Debug => "debug",
             Self::Info => "info",
             Self::Warning => "warning",
+            Self::Error => "error",
             Self::Critical => "critical",
+        }
+    }
+}
+
+impl From<LogLevel> for log::LevelFilter {
+    fn from(value: LogLevel) -> Self {
+        match value {
+            LogLevel::Debug => Self::Debug,
+            LogLevel::Info => Self::Info,
+            LogLevel::Warning => Self::Warn,
+            LogLevel::Error => Self::Error,
+            LogLevel::Critical => Self::Error,
         }
     }
 }
@@ -140,15 +155,15 @@ pub struct Opt {
     ///
     /// When running as client, this is the server address of the Coordinator
     /// to connect to.
-    #[structopt(short = "a", long)]
-    pub server_address: Option<String>,
+    #[structopt(short = "a", long, default_value = "localhost")]  // FIXME: maybe 127.0.0.1
+    pub server_address: String,
 
     /// When running as a server, this is the port to listen to.
     /// Will be picked at random and printed if not specified.
     ///
     /// When running as a client, this is the port to use to connect.
-    #[structopt(short = "p", long)]
-    pub server_port: Option<u16>,
+    #[structopt(short = "p", long, default_value = "31415")]  // FIXME: find a better reference than PI
+    pub server_port: u16,
 
     #[structopt(subcommand)]
     pub command: Command,
