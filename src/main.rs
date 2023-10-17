@@ -3,6 +3,7 @@ pub(crate) mod cmdline;
 pub mod common;
 pub(crate) mod server;
 
+use common::Address;
 use log::{info, debug};
 use structopt::StructOpt;
 
@@ -68,12 +69,16 @@ fn logger_init(opt: &cmdline::Opt) -> color_eyre::eyre::Result<()> {
     use simplelog::{ConfigBuilder, LevelFilter, TermLogger, ThreadLogMode, TerminalMode, ColorChoice, WriteLogger, CombinedLogger, SharedLogger};
 
     let config = ConfigBuilder::new()
-        .set_location_level(LevelFilter::Error)
+        .set_level_padding(simplelog::LevelPadding::Right)
+        .set_location_level(LevelFilter::Trace)
         .set_target_level(LevelFilter::Error)
+        .set_target_padding(simplelog::TargetPadding::Right(23))
         .set_thread_level(LevelFilter::Error)
         .set_thread_mode(ThreadLogMode::Names)
+        .set_thread_padding(simplelog::ThreadPadding::Right(6))
         .set_time_format_custom(
-            format_description!("[year]-[month]-[day] [hour]:[minute]:[second].[subsecond]"))  // "%Y-%m-%d %H:%M:%S.%6f"
+            format_description!("[year]-[month]-[day] [hour]:[minute]:[second].[subsecond digits:6]"))  // "%Y-%m-%d %H:%M:%S.%6f"
+        .set_time_offset_to_local().map_or_else(|b| { eprintln!("Failed to set time offset"); b }, |b| b)
         .build();
 
     let log_level = opt.log_level.into();
@@ -103,15 +108,20 @@ fn main() -> color_eyre::eyre::Result<()> {
 
     logger_init(&opt)?;
 
+    let server_address = Address {
+        host: opt.server_address,
+        port: opt.server_port,
+    };
+
     match opt.command {
         cmdline::Command::Server(command) => {
             info!("Starting server ({}), PID {}", get_version(), std::process::id());
             info!("Running on OS: {}", os_string());
-            server::main(command, opt.server_address, opt.server_port)
+            Ok(server::main(command, server_address)?)
         },
         cmdline::Command::Client(command) => {
             debug!("Starting client ({}), PID {}", get_version(), std::process::id());
-            client::main(command, opt.server_address, opt.server_port)
+            Ok(client::main(command, server_address)?)
         },
     }
 }
