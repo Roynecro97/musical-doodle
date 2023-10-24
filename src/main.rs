@@ -1,6 +1,7 @@
+pub mod common;
+pub mod error;
 pub(crate) mod client;
 pub(crate) mod cmdline;
-pub mod common;
 pub(crate) mod server;
 
 use common::Address;
@@ -117,11 +118,11 @@ fn main() -> color_eyre::eyre::Result<()> {
         cmdline::Command::Server(command) => {
             info!("Starting server ({}), PID {}", get_version(), std::process::id());
             info!("Running on OS: {}", os_string());
-            Ok(server::main(command, server_address)?)
+            server::main(command, server_address)
         },
         cmdline::Command::Client(command) => {
             debug!("Starting client ({}), PID {}", get_version(), std::process::id());
-            Ok(client::main(command, server_address)?)
+            client::main(command, server_address)
         },
     }
 }

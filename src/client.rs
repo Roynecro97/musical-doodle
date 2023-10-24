@@ -1,65 +1,13 @@
-use std::fmt::Display;
-use std::sync::mpsc::{channel, Receiver, RecvError, Sender};
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
 use color_eyre::eyre::Result;
 use log::info;
-use thiserror::Error;
 
 use crate::cmdline::{self, ClientCommand};
 use crate::common::{self, get_ws_builder, Address, Message, Request, WSMsg};
-
-#[derive(Debug, Error)]
-pub enum ClientError {
-    IoError(std::io::Error),
-    JsonError(serde_json::Error),
-    MpscRecvError(RecvError),
-    NoOpen(WSMsg),
-    SocketError(ws::Error),
-    UnexpectedResponse(WSMsg),
-    UrlError(url::ParseError),
-    // FailureResponse(common::Error),  // TODO: add error
-    // FaultStatus,
-    // FailedStatus,
-    Generic(String),
-}
-
-impl Display for ClientError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self, f)
-    }
-}
-
-impl From<std::io::Error> for ClientError {
-    fn from(v: std::io::Error) -> Self {
-        Self::IoError(v)
-    }
-}
-
-impl From<serde_json::Error> for ClientError {
-    fn from(v: serde_json::Error) -> Self {
-        Self::JsonError(v)
-    }
-}
-
-impl From<RecvError> for ClientError {
-    fn from(v: RecvError) -> Self {
-        Self::MpscRecvError(v)
-    }
-}
-
-impl From<ws::Error> for ClientError {
-    fn from(v: ws::Error) -> Self {
-        Self::SocketError(v)
-    }
-}
-
-impl From<url::ParseError> for ClientError {
-    fn from(v: url::ParseError) -> Self {
-        Self::UrlError(v)
-    }
-}
+use crate::error::{DoodleError, AsEyreErrorResult};
 
 pub struct Client {
     sender: Arc<Mutex<Option<ws::Sender>>>,
@@ -125,12 +73,12 @@ pub fn send_json_message(message: &Message, sender: &ws::Sender) -> Result<()> {
     let serialized = serde_json::to_string(&message).unwrap_or_else(|e| {
         panic!("to_string failed on \"{}\" with {:?} as input", e, message);
     });
-    Ok(sender.send(serialized).map_err(ClientError::from)?)
+    sender.send(serialized).as_eyre_result()
 }
 
 impl Client {
     pub fn recv(&self) -> Result<WSMsg> {
-        Ok(self.recv_channel.recv().map_err(ClientError::from)?)
+        self.recv_channel.recv().as_eyre_result()
     }
 
     pub fn send(&self, message: Message) -> Result<()> {
@@ -193,7 +141,7 @@ impl Client {
         })?;
 
         let parsed = url::Url::parse(&format!("ws://{}:{}", address.host, address.port))
-            .map_err(ClientError::from)?;
+            .as_eyre_result()?;
         let th = thread::Builder::new()
             .name("client".to_owned())
             .spawn(move || {
@@ -214,18 +162,19 @@ impl Client {
 
                 info!("Ending client thread");
             })
-            .map_err(ClientError::from)?;
+            .and_then(|_| Err(std::io::Error::from_raw_os_error(2)))
+            .as_eyre_result()?;
 
         client.thread = Some(th);
         Ok(client)
     }
 }
 
-pub fn make_message(command: &cmdline::Client) -> color_eyre::eyre::Result<Message> {
+pub fn make_message(command: &cmdline::Client) -> Result<Message> {
     Ok(Message::Request(match &command.command {
         ClientCommand::Play(_) => Request::Play(common::PlayReq),
         ClientCommand::Pause | ClientCommand::Queue(_) | ClientCommand::Status => {
-            Err(ClientError::Generic("Not Implemented".to_owned()))?
+            Err(DoodleError::Generic("Not Implemented".to_owned()))?
         }
         ClientCommand::Shutdown => Request::Shutdown,
     }))
@@ -239,7 +188,7 @@ pub(crate) fn main(command: cmdline::Client, server_address: Address) -> Result<
     let client = Client::new(&server_address)?;
     match client.recv()? {
         WSMsg::Open => {}
-        connect_rsp => return Err(ClientError::NoOpen(connect_rsp))?,
+        connect_rsp => return Err(DoodleError::NoOpen(connect_rsp))?,
     }
 
     client.send(message)?;
@@ -248,7 +197,7 @@ pub(crate) fn main(command: cmdline::Client, server_address: Address) -> Result<
     if let WSMsg::Message(Message::Response(response)) = rsp {
         info!("{:#?}", response); // TODO: replace with debug!(...) when we have real handling
     } else {
-        return Err(ClientError::UnexpectedResponse(rsp))?;
+        return Err(DoodleError::UnexpectedResponse(rsp))?;
     }
 
     Ok(())
