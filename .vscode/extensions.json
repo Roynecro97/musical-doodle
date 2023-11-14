@@ -1,0 +1,12 @@
+{
+    "recommendations": [
+        "rust-lang.rust-analyzer",
+        "serayuzgur.crates",
+        "streetsidesoftware.code-spell-checker",
+        "streetsidesoftware.code-spell-checker-medical-terms",
+        "streetsidesoftware.code-spell-checker-scientific-terms"
+    ],
+    "unwantedRecommendations": [
+        "rust-lang.rust"
+    ]
+}

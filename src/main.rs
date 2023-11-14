@@ -1,9 +1,30 @@
-use std::{io::BufReader, fs::File};
+pub mod common;
+pub mod error;
+pub(crate) mod client;
+pub(crate) mod cmdline;
+pub(crate) mod server;
 
-use rodio::{OutputStream, Decoder, Sink};
-use serde_derive::{Serialize, Deserialize};
-use structopt::{clap::AppSettings, StructOpt};
+use common::Address;
+use log::{info, debug};
+use structopt::StructOpt;
 
+#[cfg(target_feature = "play-single-file")]
+use serde_derive::{Deserialize, Serialize};
+#[cfg(target_feature = "play-single-file")]
+use structopt::clap::AppSettings;
+
+// #[derive(Debug, Error)]  // Error from thiserror
+// enum MainError {
+//     InvalidLoggingLevel,
+// }
+
+// impl std::fmt::Display for MainError {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         std::fmt::Debug::fmt(self, f)
+//     }
+// }
+
+#[cfg(target_feature = "play-single-file")]
 #[derive(Debug, Clone, Serialize, Deserialize, StructOpt)]
 #[structopt(
     // name = "",  // leaves 2 blank lines at the start
@@ -19,16 +40,107 @@ struct Opt {
     times: u32,
 }
 
+pub fn get_version() -> &'static str {
+    const VERSION: &str = git_version::git_version!();
+
+    #[cfg(debug_assertions)]
+    const EXTRA: &str = ", DEBUG BUILD";
+    #[cfg(not(debug_assertions))]
+    const EXTRA: &str = "";
+
+    lazy_static::lazy_static! {
+        static ref FULL_VERSION: String = format!("magical-doodle {}{}", VERSION, EXTRA);
+    }
+
+    return FULL_VERSION.as_str();
+}
+
+pub fn os_string() -> String {
+    match (sys_info::os_release().ok(), sys_info::os_type().ok()) {
+        (Some(release), Some(os_type)) =>
+            format!("{}, kernel-ver {}", os_type, release),
+        _ => format!("Unknown"),
+    }
+}
+
+#[cfg(not(target_feature = "lol"))]
+fn logger_init(opt: &cmdline::Opt) -> color_eyre::eyre::Result<()> {
+    use std::fs::File;
+    use time::macros::format_description;
+    use simplelog::{ConfigBuilder, LevelFilter, TermLogger, ThreadLogMode, TerminalMode, ColorChoice, WriteLogger, CombinedLogger, SharedLogger};
+
+    let config = ConfigBuilder::new()
+        .set_level_padding(simplelog::LevelPadding::Right)
+        .set_location_level(LevelFilter::Trace)
+        .set_target_level(LevelFilter::Error)
+        .set_target_padding(simplelog::TargetPadding::Right(23))
+        .set_thread_level(LevelFilter::Error)
+        .set_thread_mode(ThreadLogMode::Names)
+        .set_thread_padding(simplelog::ThreadPadding::Right(6))
+        .set_time_format_custom(
+            format_description!("[year]-[month]-[day] [hour]:[minute]:[second].[subsecond digits:6]"))  // "%Y-%m-%d %H:%M:%S.%6f"
+        .set_time_offset_to_local().map_or_else(|b| { eprintln!("Failed to set time offset"); b }, |b| b)
+        .build();
+
+    let log_level = opt.log_level.into();
+
+    let mut loggers: Vec<Box<(dyn SharedLogger + 'static)>> = Vec::with_capacity(2);
+
+    if !opt.quiet {
+        loggers.push(
+            TermLogger::new(log_level, config.clone(), TerminalMode::Stderr, ColorChoice::Auto)
+        )
+    }
+
+    if let Some(path) = &opt.logfile {
+        loggers.push(
+            WriteLogger::new(log_level, config, File::create(path)?)
+        )
+    }
+
+    Ok(CombinedLogger::init(loggers)?)
+}
+
+// #[cfg(not(target_feature="play-single-file"))]
 fn main() -> color_eyre::eyre::Result<()> {
+    color_eyre::install()?;
+
+    let opt = cmdline::Opt::from_args();
+
+    logger_init(&opt)?;
+
+    let server_address = Address {
+        host: opt.server_address,
+        port: opt.server_port,
+    };
+
+    match opt.command {
+        cmdline::Command::Server(command) => {
+            info!("Starting server ({}), PID {}", get_version(), std::process::id());
+            info!("Running on OS: {}", os_string());
+            server::main(command, server_address)
+        },
+        cmdline::Command::Client(command) => {
+            debug!("Starting client ({}), PID {}", get_version(), std::process::id());
+            client::main(command, server_address)
+        },
+    }
+}
+
+#[cfg(target_feature="play-single-file")]
+fn main() -> color_eyre::eyre::Result<()> {
+    use std::{fs::File, io::BufReader};
+    use rodio::{Decoder, OutputStream, Sink};
+
     color_eyre::install()?;
 
     let opt = Opt::from_args();
     println!("Hello, world!");
     println!("My configuration is {:?}", opt);
 
-    use rodio::cpal::traits::{HostTrait, DeviceTrait};
+    use rodio::cpal::traits::{DeviceTrait, HostTrait};
     let host = rodio::cpal::default_host();
-    println!("default: {:?}", host.default_output_device().map(|d| d.name().unwrap_or("missing name".to_owned())));
+    println!("default: {:?}", host.default_output_device() .map(|d| d.name().unwrap_or("missing name".to_owned())));
     for (i, device) in host.output_devices()?.enumerate() {
         println!("{}: {}", i, device.name().unwrap_or("missing name".to_owned()));
     }
