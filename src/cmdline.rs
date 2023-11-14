@@ -155,14 +155,14 @@ pub struct Opt {
     ///
     /// When running as client, this is the server address of the Coordinator
     /// to connect to.
-    #[structopt(short = "a", long, default_value = "localhost")]  // FIXME: maybe 127.0.0.1
+    #[structopt(short = "a", long, default_value = "0.0.0.0")]
     pub server_address: String,
 
     /// When running as a server, this is the port to listen to.
     /// Will be picked at random and printed if not specified.
     ///
     /// When running as a client, this is the port to use to connect.
-    #[structopt(short = "p", long, default_value = "31415")]  // FIXME: find a better reference than PI
+    #[structopt(short = "p", long, default_value = "31415")]
     pub server_port: u16,
 
     #[structopt(subcommand)]
