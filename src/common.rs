@@ -38,7 +38,7 @@ impl std::fmt::Debug for ServerRequest {
 /////////////////
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, Ord, PartialOrd, Serialize, Deserialize)]
-pub struct ConnId(u64);
+pub struct ConnId(pub u64);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Address {

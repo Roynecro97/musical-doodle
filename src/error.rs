@@ -1,13 +1,14 @@
 use std::fmt::Display;
-use std::sync::mpsc::RecvError;
+use std::sync::mpsc::{RecvError, SendError};
 
-use crate::common::WSMsg;
+use crate::common::{WSMsg, ServerRequest};
 
 #[derive(Debug, thiserror::Error)]
 pub enum DoodleError {
     IoError(std::io::Error),
     JsonError(serde_json::Error),
     MpscRecvError(RecvError),
+    MpscSendError(SendError<ServerRequest>),
     NoOpen(WSMsg),
     SocketError(ws::Error),
     UnexpectedResponse(WSMsg),
@@ -39,6 +40,12 @@ impl From<serde_json::Error> for DoodleError {
 impl From<RecvError> for DoodleError {
     fn from(v: RecvError) -> Self {
         Self::MpscRecvError(v)
+    }
+}
+
+impl From<SendError<ServerRequest>> for DoodleError {
+    fn from(v: SendError<ServerRequest>) -> Self {
+        Self::MpscSendError(v)
     }
 }
 
