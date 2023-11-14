@@ -7,7 +7,7 @@ use log::info;
 
 use crate::cmdline::{self, ClientCommand};
 use crate::common::{self, get_ws_builder, Address, Message, Request, WSMsg};
-use crate::error::{DoodleError, AsEyreErrorResult};
+use crate::error::{AsEyreErrorResult, DoodleError};
 
 pub struct Client {
     sender: Arc<Mutex<Option<ws::Sender>>>,
@@ -69,13 +69,6 @@ impl ws::Handler for ClientInner {
     }
 }
 
-pub fn send_json_message(message: &Message, sender: &ws::Sender) -> Result<()> {
-    let serialized = serde_json::to_string(&message).unwrap_or_else(|e| {
-        panic!("to_string failed on \"{}\" with {:?} as input", e, message);
-    });
-    sender.send(serialized).as_eyre_result()
-}
-
 impl Client {
     pub fn recv(&self) -> Result<WSMsg> {
         self.recv_channel.recv().as_eyre_result()
@@ -85,7 +78,7 @@ impl Client {
         let sender = self.sender.lock().unwrap();
         match &*sender {
             None => Ok(()),
-            Some(sender) => send_json_message(&message, sender),
+            Some(sender) => common::send_json_message(&message, sender),
         }
     }
 
@@ -140,8 +133,8 @@ impl Client {
             }
         })?;
 
-        let parsed = url::Url::parse(&format!("ws://{}:{}", address.host, address.port))
-            .as_eyre_result()?;
+        let parsed =
+            url::Url::parse(&format!("ws://{}:{}", address.host, address.port)).as_eyre_result()?;
         let th = thread::Builder::new()
             .name("client".to_owned())
             .spawn(move || {
@@ -162,7 +155,6 @@ impl Client {
 
                 info!("Ending client thread");
             })
-            .and_then(|_| Err(std::io::Error::from_raw_os_error(2)))
             .as_eyre_result()?;
 
         client.thread = Some(th);
