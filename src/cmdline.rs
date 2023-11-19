@@ -26,7 +26,6 @@ pub struct Play {
     pub command: Option<Music>,
 }
 
-
 #[derive(Debug, StructOpt)]
 pub struct Queue {
     #[structopt(long)]
